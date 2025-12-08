@@ -2,13 +2,10 @@ const BigQuery = require('BigQuery');
 const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getContainerVersion = require('getContainerVersion');
-const getCookieValues = require('getCookieValues');
 const getRequestHeader = require('getRequestHeader');
 const getTimestampMillis = require('getTimestampMillis');
-const getType = require('getType');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
-const makeInteger = require('makeInteger');
 const makeString = require('makeString');
 const sendHttpRequest = require('sendHttpRequest');
 
@@ -17,6 +14,9 @@ const sendHttpRequest = require('sendHttpRequest');
 
 const eventData = getAllEventData();
 
+if(checkGuardClauses(data,eventData)) return;
+
+sendConversion(data);
 
 if (data.useOptimisticScenario) {
   return data.gtmOnSuccess();
@@ -27,23 +27,79 @@ if (data.useOptimisticScenario) {
 ==============================================================================*/
 
 
+function sendConversion(data) {
+  const goal = data.conversionId;
+  const clickId = data.clickId;
+  let requestUrl = 'https://s.magsrv.com/tag.php?' + 'goal=' + enc(goal) + '&tag=' + enc(clickId);
+
+  const requestOptions = {
+    method: "GET"
+  };
+  
+  if(data.conversionValue === 'dynamic') requestUrl += '&value=' + enc(makeString(data.value));
+  
+
+  log({
+    Name: 'Exoclick',
+    Type: 'Request',
+    EventName: 'Conversion',
+    RequestMethod: requestOptions.method,
+    RequestUrl: requestUrl,
+    RequestBody: ''
+  });
+
+  return sendHttpRequest(requestUrl, requestOptions)
+  .then(response => {
+       log({
+        Name: 'Exoclick',
+        Type: 'Response',
+        EventName: 'Conversion',
+        ResponseStatusCode: response.statusCode,
+        ResponseHeaders: response.headers,
+        ResponseBody: response.body
+      });  
+    
+    if(response.body.match('ERROR')) {
+      return data.gtmOnFailure();
+    }
+    else {
+      return data.gtmOnSuccess();
+    }
+  })
+  .catch(error => {
+       log({
+        Name: 'Exoclick',
+        Type: 'Message',
+        EventName: 'Conversion',
+        Message: 'API call failed or timed out',
+        Reason: error
+      });
+  });
+}
+
+
+
+
+
 
 /*==============================================================================
   Helpers
 ==============================================================================*/
 
-function getUrl(eventData) {
-  return eventData.page_location || eventData.page_referrer || getRequestHeader('referer');
+function checkGuardClauses(data,eventData) {
+  const url = eventData.page_location || getRequestHeader('referer');
+
+  if (!isConsentGivenOrNotRequired(data, eventData)) {
+    data.gtmOnSuccess();
+    return true;
+  }
+
+  if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
+    data.gtmOnSuccess();
+    return true;
+  }
 }
 
-function isUIFieldTrue(field) {
-  return [true, 'true', 1, '1'].indexOf(field) !== -1;
-}
-
-function isValidValue(value) {
-  const valueType = getType(value);
-  return valueType !== 'null' && valueType !== 'undefined' && value !== '';
-}
 
 function enc(data) {
   if (data === undefined || data === null) data = '';
