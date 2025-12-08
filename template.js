@@ -26,7 +26,6 @@ if (data.useOptimisticScenario) {
   Vendor related functions
 ==============================================================================*/
 
-
 function sendConversion(data) {
   const goal = data.conversionId;
   const clickId = data.clickId;
@@ -74,13 +73,9 @@ function sendConversion(data) {
         Message: 'API call failed or timed out',
         Reason: error
       });
+    return data.gtmOnFailure();
   });
 }
-
-
-
-
-
 
 /*==============================================================================
   Helpers
@@ -99,7 +94,6 @@ function checkGuardClauses(data,eventData) {
     return true;
   }
 }
-
 
 function enc(data) {
   if (data === undefined || data === null) data = '';
