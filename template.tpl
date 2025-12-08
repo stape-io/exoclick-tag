@@ -36,6 +36,108 @@ ___TEMPLATE_PARAMETERS___
 [
   {
     "type": "GROUP",
+    "name": "configGroup",
+    "displayName": "",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
+      {
+        "type": "RADIO",
+        "name": "type",
+        "displayName": "Event Type",
+        "radioItems": [
+          {
+            "value": "pageview",
+            "displayValue": "Page View",
+            "subParams": [
+              {
+                "type": "TEXT",
+                "name": "clickIdKey",
+                "displayName": "Click ID Key",
+                "simpleValueType": true,
+                "help": "Enter your custom click ID key. It is the key for your \u003cb\u003e{conversions_tracking} \u003c/b\u003e token found in your ad destination URL. It is user-defined in the Exoclick platform at Ad Level. \n\u003c/br\u003e\n\u003c/br\u003e\nIn this following example, \u003cb\u003eexotracker\u003c/b\u003e would be the correct value to fill this input.\n\u003c/br\u003e\n\u003c/br\u003e\n\u003ci\u003e(e.g. http://www.yoursite.com/?\u003cb\u003eexotracker\u003c/b\u003e\u003d{conversions_tracking}\u003c/i\u003e",
+                "valueValidators": [
+                  {
+                    "type": "NON_EMPTY"
+                  }
+                ]
+              },
+              {
+                "type": "GROUP",
+                "name": "cookieSettingsGroup",
+                "displayName": "Cookie Settings (Web only)",
+                "groupStyle": "ZIPPY_OPEN",
+                "subParams": [
+                  {
+                    "type": "TEXT",
+                    "name": "cookieExpiration",
+                    "displayName": "Cookie Expiration",
+                    "simpleValueType": true,
+                    "help": "The number of days Click ID cookie will live.\n\u003cbr\u003e\u003cbr\u003e\nSet this to, at least, the agreed cookie duration on your program settings.",
+                    "valueUnit": "days",
+                    "defaultValue": 365,
+                    "valueHint": "365",
+                    "valueValidators": [
+                      {
+                        "type": "NON_NEGATIVE_NUMBER"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "TEXT",
+                    "name": "cookieDomain",
+                    "displayName": "Cookie Domain",
+                    "simpleValueType": true,
+                    "help": "Overrides the cookie domain (defaults to \u003cb\u003eauto\u003c/b\u003e).\n\u003cbr/\u003e\nEnter your website\u0027s top-level domain as a fixed value (e.g., example.com).\n\u003cbr/\u003e\nIf left as default, the top-level domain will be automatically determined using the following priority:\n\u003cul\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eForwarded\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eX-Forwarded-Host\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eHost\u003c/i\u003e header.\u003c/li\u003e\n\u003c/ul\u003e",
+                    "valueValidators": [
+                      {
+                        "type": "NON_EMPTY"
+                      }
+                    ],
+                    "defaultValue": "auto",
+                    "valueHint": "example.com"
+                  },
+                  {
+                    "type": "SELECT",
+                    "name": "cookieHttpOnly",
+                    "displayName": "Http Only Flag",
+                    "macrosInSelect": true,
+                    "selectItems": [
+                      {
+                        "value": false,
+                        "displayValue": "False"
+                      },
+                      {
+                        "value": true,
+                        "displayValue": "True"
+                      }
+                    ],
+                    "simpleValueType": true,
+                    "defaultValue": false
+                  }
+                ],
+                "enablingConditions": [
+                  {
+                    "paramName": "type",
+                    "paramValue": "pageview",
+                    "type": "EQUALS"
+                  }
+                ]
+              }
+            ],
+            "help": "Fire this event when the customer reaches your landing page in order to store on cookie the \u003cb\u003e click ID \u003c/b\u003e from your ad destination URL. This cookie value can be later used to populate the conversion event."
+          },
+          {
+            "value": "conversion",
+            "displayValue": "Conversion",
+            "help": "Sends a postback conversion to Exoclick"
+          }
+        ],
+        "simpleValueType": true
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
     "name": "conversionGroup",
     "subParams": [
       {
@@ -55,8 +157,7 @@ ___TEMPLATE_PARAMETERS___
         "name": "clickId",
         "displayName": "Click ID",
         "simpleValueType": true,
-        "notSetText": "",
-        "help": "Your defined ad click ID. It must carry the value of your \u003cb\u003e{conversion_tracking}\u003c/b\u003e ad destination parameter. You can find an example of this value while editing your campaign Ads. Just click on \"Test Variation\" icon present in one of your listed ads. You will notice that the link takes you to the final destination, with the URL decorated with your click-ID. Check \u003ca href\u003d\"https://docs.exoclick.com/docs/conversion-tracking/\"\u003e documentation \u003c/a\u003e for more information.",
+        "help": "Your defined ad click ID. It must carry the value of your \u003cb\u003e{conversions_tracking}\u003c/b\u003e ad destination token. If you are firing a Page View, this value will be stored as a first party cookie having the same name you defined on the platform. In the example below the cookie named \u003cb\u003eexotracker\u003c/b\u003e will retrieve the correct value.\n\u003c/br\u003e\n\u003c/br\u003e\n\u003ci\u003e(E.g. http://www.yoursite.com/?\u003cb\u003eexotracker\u003c/b\u003e\u003d{conversions_tracking}\u003c/i\u003e\n\u003c/br\u003e\n\u003c/br\u003e\nYou can find an example of this value while editing your campaign Ads by clicking on the \"Test Variation\" icon present in one of your listed ads. You will notice that the link takes you to the ad target landing page, with the URL decorated with your click-ID. \n\u003c/br\u003e\nCheck \u003ca href\u003d\"https://docs.exoclick.com/docs/conversion-tracking/\"\u003e documentation \u003c/a\u003e for more information.",
         "valueValidators": [
           {
             "type": "NON_EMPTY"
@@ -97,6 +198,14 @@ ___TEMPLATE_PARAMETERS___
       },
       {
         "type": "CHECKBOX",
+        "name": "cookieSync",
+        "checkboxText": "Enable cookie syncing",
+        "simpleValueType": true,
+        "help": "Check this box if you want to send cookie-syncing pixels from the browser. Note that this is already done by the Exoclick Javascript client-side code, so use wisely and avoid duplicates.",
+        "defaultValue": false
+      },
+      {
+        "type": "CHECKBOX",
         "name": "useOptimisticScenario",
         "checkboxText": "Use Optimistic Scenario",
         "simpleValueType": true,
@@ -105,7 +214,14 @@ ___TEMPLATE_PARAMETERS___
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
-    "displayName": "Conversion Data"
+    "displayName": "Conversion Data",
+    "enablingConditions": [
+      {
+        "paramName": "type",
+        "paramValue": "conversion",
+        "type": "EQUALS"
+      }
+    ]
   },
   {
     "type": "GROUP",
@@ -241,7 +357,11 @@ const getTimestampMillis = require('getTimestampMillis');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
 const makeString = require('makeString');
+const makeInteger = require('makeInteger');
+const setCookie = require('setCookie');
+const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
+const sendPixelFromBrowser = require('sendPixelFromBrowser');
 
 /*==============================================================================
 ==============================================================================*/
@@ -249,6 +369,8 @@ const sendHttpRequest = require('sendHttpRequest');
 const eventData = getAllEventData();
 
 if(checkGuardClauses(data,eventData)) return;
+
+if(data.type === 'pageview') return storeClickId(data.clickIdKey);
 
 sendConversion(data);
 
@@ -264,13 +386,12 @@ function sendConversion(data) {
   const goal = data.conversionId;
   const clickId = data.clickId;
   let requestUrl = 'https://s.magsrv.com/tag.php?' + 'goal=' + enc(goal) + '&tag=' + enc(clickId);
-
   const requestOptions = {
     method: "GET"
   };
   
   if(data.conversionValue === 'dynamic') requestUrl += '&value=' + enc(makeString(data.value));
-  
+  if(data.cookieSync) sendCookieSyncPixel(goal, data.value);
 
   log({
     Name: 'Exoclick',
@@ -280,7 +401,7 @@ function sendConversion(data) {
     RequestUrl: requestUrl,
     RequestBody: ''
   });
-
+  
   return sendHttpRequest(requestUrl, requestOptions)
   .then(response => {
        log({
@@ -311,6 +432,36 @@ function sendConversion(data) {
   });
 }
 
+function storeClickId(key){  
+  const url = eventData.page_location || getRequestHeader('referer');
+  const urlSearchParams = parseUrl(url).searchParams;
+  const clickId = urlSearchParams[data.clickIdKey];
+ 
+  if (!url) return data.gtmOnSuccess();
+
+  const cookieOptions = {
+    domain: data.cookieDomain || 'auto',
+    samesite: 'Lax',
+    path: '/',
+    secure: true,
+    httpOnly: !!data.cookieHttpOnly,
+    'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
+  };
+
+  if (clickId) setCookie(data.clickIdKey, clickId, cookieOptions, false);
+
+  return data.gtmOnSuccess();  
+}
+
+function sendCookieSyncPixel(conversionId,value){
+  const syncingDomainAliases = ["s.chmsrv.com", "s.chnsrv.com", "s.ds10lf.com", "s.ds165z.com", "s.eln7dc.com", "s.opoxv.com", "s.orbsrv.com", "s.pemsrv.com", "s.zlinkw.com", "syndication.realsrv.com"];
+  syncingDomainAliases.forEach(alias => {
+    let url = 'https://' + alias + '/tag.php?' + 'goal=' +enc(conversionId);
+    if(value) url+= '&value='+value;
+    sendPixelFromBrowser(url);
+  });
+}
+
 /*==============================================================================
   Helpers
 ==============================================================================*/
@@ -319,13 +470,11 @@ function checkGuardClauses(data,eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
 
   if (!isConsentGivenOrNotRequired(data, eventData)) {
-    data.gtmOnSuccess();
-    return true;
+    return data.gtmOnSuccess();
   }
 
   if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
-    data.gtmOnSuccess();
-    return true;
+    return data.gtmOnSuccess();
   }
 }
 
@@ -655,6 +804,148 @@ ___SERVER_PERMISSIONS___
                     "string": "write"
                   }
                 ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "set_cookies",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedCookies",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "send_pixel_from_browser",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedUrls",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        },
+        {
+          "key": "urls",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "https://s.chmsrv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.chnsrv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.ds10lf.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.ds165z.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.eln7dc.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.magsrv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.opoxv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.orbsrv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.pemsrv.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://s.zlinkw.com/*"
+              },
+              {
+                "type": 1,
+                "string": "https://syndication.realsrv.com/*"
               }
             ]
           }

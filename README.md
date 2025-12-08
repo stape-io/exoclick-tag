@@ -1,35 +1,38 @@
 # Exoclick Tag for GTM Server-Side
 
-This server-side tag allows you to track Exoclick conversions via server-to-server (S2S) postbacks directly from your Google Tag Manager Server container.
+This server-side tag allows you to track Exoclick conversions via server-to-server (S2S) postbacks and handle Click ID storage directly from your Google Tag Manager Server container.
 
 ## Features
 
-- **Conversion Tracking**: Sends conversion data to Exoclick using Goal IDs and Click IDs.
-- **Value Flexibility**: Supports both **Fixed** (configured in Exoclick) and **Dynamic** (passed via variable) conversion values.
-- **Optimistic Scenario**: Option to trigger `gtmOnSuccess()` immediately without waiting for the API response to speed up response times.
-- **Consent Checks**: Built-in support for checking `ad_storage` consent before execution.
+- **Event Support**: Handles **Page View** (for storing Click IDs) and **Conversion** (for tracking goals).
+- **Cookie Management**: Automatically extracts the Click ID from the URL during a Page View and stores it as a first-party cookie.
+- **Cookie Syncing**: Optional feature to fire browser-side pixels to synchronize cookies across Exoclick domains.
+- **Optimistic Scenario**: Option to trigger `gtmOnSuccess()` immediately without waiting for the API response.
 - **BigQuery Logging**: Native support for streaming request and response data to BigQuery.
 
 ## Configuration
 
-### 1. Conversion Data
+### 1. Event Type
 
-- **Goal ID**: Enter the Goal ID found in your Exoclick Conversion Tracking tab.
-- **Click ID**: Enter the unique Click ID. This usually carries the value of the `{conversion_tracking}` or `tag` parameter from your landing page URL.
-- **Conversion Value**:
-  - **Fixed Value**: Select if the goal value is set within Exoclick.
-  - **Dynamic Value**: Select to map a specific numeric value from your event data.
+- **Page View**: Fires when a user reaches the landing page to store the Click ID.
+  - **Click ID Key**: The query parameter key for your `{conversions_tracking}` token (e.g., `exotracker`).
+  - **Cookie Settings**: Define **Expiration** (days), **Domain**, and **HttpOnly** flag for the Click ID cookie.
+- **Conversion**: Sends a postback to Exoclick.
+  - **Goal ID**: Found in the "ID" column of your Exoclick Conversion Tracking tab.
+  - **Click ID**: The unique tracking ID.
+  - **Conversion Value**: Choose **Fixed** (set in platform) or **Dynamic** (passed via variable).
+  - **Enable cookie syncing**: Check to send cookie-syncing pixels from the browser (e.g., to `s.chmsrv.com`, `s.pemsrv.com`, etc.).
+
+### 2. General Settings
+
 - **Use Optimistic Scenario**: Check to fire the tag success trigger regardless of the actual API result.
-
-### 2. Tag Execution Consent Settings
-
 - **Ad Storage Consent**: Choose "Send data in case marketing consent given" to abort execution if `ad_storage` is not granted.
 
-### 3. Logs Settings
+### 3. Logging
 
 - **Logs Settings**: Options to log to console "Always", "Never", or during "Debug and preview".
 - **BigQuery Logs**: Enable to log full event data to a BigQuery table.
-  - **Project ID**: Defaults to the environment variable `GOOGLE_CLOUD_PROJECT` if left empty.
+  - **Project ID**: Defaults to `GOOGLE_CLOUD_PROJECT` environment variable if empty.
   - **Dataset ID**: Required.
   - **Table ID**: Required.
 
@@ -37,6 +40,8 @@ This server-side tag allows you to track Exoclick conversions via server-to-serv
 
 This template requires the following permissions:
 
-- **Access to Global Variables**: Reads event data and container version.
 - **Send HTTP Requests**: Grants access to `https://s.magsrv.com/`.
+- **Send Pixels**: Grants access to Exoclick sync domains (e.g., `https://s.chmsrv.com/`, `https://s.ds10lf.com/`, etc.) if syncing is enabled.
+- **Set Cookies**: To store the Click ID.
 - **Access BigQuery**: Requires `write` access if BigQuery logging is enabled.
+- **Access to Global Variables**: Reads event data, container version, and request headers.

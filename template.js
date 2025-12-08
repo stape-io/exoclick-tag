@@ -7,7 +7,11 @@ const getTimestampMillis = require('getTimestampMillis');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
 const makeString = require('makeString');
+const makeInteger = require('makeInteger');
+const setCookie = require('setCookie');
+const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
+const sendPixelFromBrowser = require('sendPixelFromBrowser');
 
 /*==============================================================================
 ==============================================================================*/
@@ -15,6 +19,8 @@ const sendHttpRequest = require('sendHttpRequest');
 const eventData = getAllEventData();
 
 if(checkGuardClauses(data,eventData)) return;
+
+if(data.type === 'pageview') return storeClickId(data.clickIdKey);
 
 sendConversion(data);
 
@@ -30,13 +36,12 @@ function sendConversion(data) {
   const goal = data.conversionId;
   const clickId = data.clickId;
   let requestUrl = 'https://s.magsrv.com/tag.php?' + 'goal=' + enc(goal) + '&tag=' + enc(clickId);
-
   const requestOptions = {
     method: "GET"
   };
   
   if(data.conversionValue === 'dynamic') requestUrl += '&value=' + enc(makeString(data.value));
-  
+  if(data.cookieSync) sendCookieSyncPixel(goal, data.value);
 
   log({
     Name: 'Exoclick',
@@ -46,7 +51,7 @@ function sendConversion(data) {
     RequestUrl: requestUrl,
     RequestBody: ''
   });
-
+  
   return sendHttpRequest(requestUrl, requestOptions)
   .then(response => {
        log({
@@ -77,6 +82,36 @@ function sendConversion(data) {
   });
 }
 
+function storeClickId(key){  
+  const url = eventData.page_location || getRequestHeader('referer');
+  const urlSearchParams = parseUrl(url).searchParams;
+  const clickId = urlSearchParams[data.clickIdKey];
+ 
+  if (!url) return data.gtmOnSuccess();
+
+  const cookieOptions = {
+    domain: data.cookieDomain || 'auto',
+    samesite: 'Lax',
+    path: '/',
+    secure: true,
+    httpOnly: !!data.cookieHttpOnly,
+    'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
+  };
+
+  if (clickId) setCookie(data.clickIdKey, clickId, cookieOptions, false);
+
+  return data.gtmOnSuccess();  
+}
+
+function sendCookieSyncPixel(conversionId,value){
+  const syncingDomainAliases = ["s.chmsrv.com", "s.chnsrv.com", "s.ds10lf.com", "s.ds165z.com", "s.eln7dc.com", "s.opoxv.com", "s.orbsrv.com", "s.pemsrv.com", "s.zlinkw.com", "syndication.realsrv.com"];
+  syncingDomainAliases.forEach(alias => {
+    let url = 'https://' + alias + '/tag.php?' + 'goal=' +enc(conversionId);
+    if(value) url+= '&value='+value;
+    sendPixelFromBrowser(url);
+  });
+}
+
 /*==============================================================================
   Helpers
 ==============================================================================*/
@@ -85,13 +120,11 @@ function checkGuardClauses(data,eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
 
   if (!isConsentGivenOrNotRequired(data, eventData)) {
-    data.gtmOnSuccess();
-    return true;
+    return data.gtmOnSuccess();
   }
 
   if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
-    data.gtmOnSuccess();
-    return true;
+    return data.gtmOnSuccess();
   }
 }
 
