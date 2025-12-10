@@ -48,82 +48,7 @@ ___TEMPLATE_PARAMETERS___
           {
             "value": "pageview",
             "displayValue": "Page View",
-            "subParams": [
-              {
-                "type": "TEXT",
-                "name": "clickIdKey",
-                "displayName": "Click ID Key",
-                "simpleValueType": true,
-                "help": "Enter your custom click ID key. It is the key for your \u003cb\u003e{conversions_tracking} \u003c/b\u003e token found in your ad destination URL. It is user-defined in the Exoclick platform at Ad Level. \n\u003c/br\u003e\n\u003c/br\u003e\nIn this following example, \u003cb\u003eexotracker\u003c/b\u003e would be the correct value to fill this input.\n\u003c/br\u003e\n\u003c/br\u003e\n\u003ci\u003e(e.g. http://www.yoursite.com/?\u003cb\u003eexotracker\u003c/b\u003e\u003d{conversions_tracking}\u003c/i\u003e",
-                "valueValidators": [
-                  {
-                    "type": "NON_EMPTY"
-                  }
-                ]
-              },
-              {
-                "type": "GROUP",
-                "name": "cookieSettingsGroup",
-                "displayName": "Cookie Settings (Web only)",
-                "groupStyle": "ZIPPY_OPEN",
-                "subParams": [
-                  {
-                    "type": "TEXT",
-                    "name": "cookieExpiration",
-                    "displayName": "Cookie Expiration",
-                    "simpleValueType": true,
-                    "help": "The number of days Click ID cookie will live.\n\u003cbr\u003e\u003cbr\u003e\nSet this to, at least, the agreed cookie duration on your program settings.",
-                    "valueUnit": "days",
-                    "defaultValue": 365,
-                    "valueHint": "365",
-                    "valueValidators": [
-                      {
-                        "type": "NON_NEGATIVE_NUMBER"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "TEXT",
-                    "name": "cookieDomain",
-                    "displayName": "Cookie Domain",
-                    "simpleValueType": true,
-                    "help": "Overrides the cookie domain (defaults to \u003cb\u003eauto\u003c/b\u003e).\n\u003cbr/\u003e\nEnter your website\u0027s top-level domain as a fixed value (e.g., example.com).\n\u003cbr/\u003e\nIf left as default, the top-level domain will be automatically determined using the following priority:\n\u003cul\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eForwarded\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eX-Forwarded-Host\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eHost\u003c/i\u003e header.\u003c/li\u003e\n\u003c/ul\u003e",
-                    "valueValidators": [
-                      {
-                        "type": "NON_EMPTY"
-                      }
-                    ],
-                    "defaultValue": "auto",
-                    "valueHint": "example.com"
-                  },
-                  {
-                    "type": "SELECT",
-                    "name": "cookieHttpOnly",
-                    "displayName": "Http Only Flag",
-                    "macrosInSelect": true,
-                    "selectItems": [
-                      {
-                        "value": false,
-                        "displayValue": "False"
-                      },
-                      {
-                        "value": true,
-                        "displayValue": "True"
-                      }
-                    ],
-                    "simpleValueType": true,
-                    "defaultValue": false
-                  }
-                ],
-                "enablingConditions": [
-                  {
-                    "paramName": "type",
-                    "paramValue": "pageview",
-                    "type": "EQUALS"
-                  }
-                ]
-              }
-            ],
+            "subParams": [],
             "help": "Fire this event when the customer reaches your landing page in order to store on cookie the \u003cb\u003e click ID \u003c/b\u003e from your ad destination URL. This cookie value can be later used to populate the conversion event."
           },
           {
@@ -133,6 +58,95 @@ ___TEMPLATE_PARAMETERS___
           }
         ],
         "simpleValueType": true
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
+    "name": "pageViewGroup",
+    "displayName": "",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
+      {
+        "type": "TEXT",
+        "name": "clickIdKey",
+        "displayName": "Click ID Key",
+        "simpleValueType": true,
+        "help": "Enter your custom click ID key. It is the key for your \u003cb\u003e{conversions_tracking} \u003c/b\u003e token found in your ad destination URL. It is user-defined in the Exoclick platform at Ad Level. \n\u003c/br\u003e\n\u003c/br\u003e\nIn this following example, \u003cb\u003eexotracker\u003c/b\u003e would be the correct value to fill this input.\n\u003c/br\u003e\n\u003c/br\u003e\n\u003ci\u003e(e.g. http://www.yoursite.com/?\u003cb\u003eexotracker\u003c/b\u003e\u003d{conversions_tracking}\u003c/i\u003e",
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          }
+        ]
+      },
+      {
+        "type": "GROUP",
+        "name": "cookieSettingsGroup",
+        "displayName": "Cookie Settings (Web only)",
+        "groupStyle": "NO_ZIPPY",
+        "subParams": [
+          {
+            "type": "TEXT",
+            "name": "cookieExpiration",
+            "displayName": "Cookie Expiration",
+            "simpleValueType": true,
+            "help": "The number of days Click ID cookie will live.\n\u003cbr\u003e\u003cbr\u003e\nSet this to, at least, the agreed cookie duration on your program settings.",
+            "valueUnit": "days",
+            "defaultValue": 365,
+            "valueHint": "365",
+            "valueValidators": [
+              {
+                "type": "NON_NEGATIVE_NUMBER"
+              }
+            ]
+          },
+          {
+            "type": "TEXT",
+            "name": "cookieDomain",
+            "displayName": "Cookie Domain",
+            "simpleValueType": true,
+            "help": "Overrides the cookie domain (defaults to \u003cb\u003eauto\u003c/b\u003e).\n\u003cbr/\u003e\nEnter your website\u0027s top-level domain as a fixed value (e.g., example.com).\n\u003cbr/\u003e\nIf left as default, the top-level domain will be automatically determined using the following priority:\n\u003cul\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eForwarded\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eX-Forwarded-Host\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eTop-level domain of the \u003ci\u003eHost\u003c/i\u003e header.\u003c/li\u003e\n\u003c/ul\u003e",
+            "valueValidators": [
+              {
+                "type": "NON_EMPTY"
+              }
+            ],
+            "defaultValue": "auto",
+            "valueHint": "example.com"
+          },
+          {
+            "type": "SELECT",
+            "name": "cookieHttpOnly",
+            "displayName": "Http Only Flag",
+            "macrosInSelect": true,
+            "selectItems": [
+              {
+                "value": false,
+                "displayValue": "False"
+              },
+              {
+                "value": true,
+                "displayValue": "True"
+              }
+            ],
+            "simpleValueType": true,
+            "defaultValue": false
+          }
+        ],
+        "enablingConditions": [
+          {
+            "paramName": "type",
+            "paramValue": "pageview",
+            "type": "EQUALS"
+          }
+        ]
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "type",
+        "paramValue": "pageview",
+        "type": "EQUALS"
       }
     ]
   },
