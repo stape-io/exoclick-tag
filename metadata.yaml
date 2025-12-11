@@ -1,5 +1,5 @@
 homepage: 'https://stape.io/'
 documentation: 'https://github.com/stape-io/exoclick-tag'
 versions:
-  - sha: f24d43b951c1039570474dd5b0c8bdfd921cc7bc
+  - sha: 77a2494ff42a81e7fd93cb6d694be6f7286cebc7
     changeNotes: Initial release.
