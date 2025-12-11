@@ -24,9 +24,9 @@ const eventData = getAllEventData();
 
 if (checkGuardClauses(data, eventData)) return;
 
-if (data.type === 'pageview') return storeClickId();
+if (data.type === 'pageview') return storeClickId(data, eventData);
 else {
-  sendConversion(data);
+  sendConversion(data, eventData);
 }
 
 if (data.useOptimisticScenario) {
@@ -37,21 +37,43 @@ if (data.useOptimisticScenario) {
   Vendor related functions
 ==============================================================================*/
 
-function sendConversion(data) {
+function sendConversion(data, eventData) {
   const goal = data.conversionId;
-  const clickId = data.clickId;
+  const clickId = getClickId(data, eventData);
+  const value = data.conversionValue;
+
   let conversionParameters = '?goal=' + enc(goal);
-  if (isValidValue(data.conversionValue))
-    conversionParameters += '&value=' + enc(data.conversionValue);
+  if (isValidValue(value)) conversionParameters += '&value=' + enc(value);
   const conversionParametersForCookieSync = conversionParameters;
   conversionParameters += '&tag=' + enc(clickId);
+
+  if (!clickId) {
+    log({
+      Name: 'ExoClick',
+      Type: 'Message',
+      EventName: 'Conversion',
+      Message:
+        'No Click ID found. ' +
+        (data.cookieSync
+          ? '3rd party cookie-syncing requests will try to be sent as fallback.'
+          : 'Aborting.')
+    });
+    if (data.cookieSync) {
+      return sendCookieSyncPixel(conversionParametersForCookieSync)
+        ? data.gtmOnSuccess()
+        : data.gtmOnFailure();
+    } else {
+      return data.gtmOnFailure();
+    }
+  }
+
   const requestUrl = 'https://s.magsrv.com/tag.php' + conversionParameters;
   const requestOptions = {
     method: 'GET'
   };
 
   log({
-    Name: 'Exoclick',
+    Name: 'ExoClick',
     Type: 'Request',
     EventName: 'Conversion',
     RequestMethod: requestOptions.method,
@@ -61,7 +83,7 @@ function sendConversion(data) {
   return sendHttpRequest(requestUrl, requestOptions)
     .then((response) => {
       log({
-        Name: 'Exoclick',
+        Name: 'ExoClick',
         Type: 'Response',
         EventName: 'Conversion',
         ResponseStatusCode: response.statusCode,
@@ -70,30 +92,39 @@ function sendConversion(data) {
       });
 
       if (!data.useOptimisticScenario) {
-        if (response.body.match('OK|ERROR: This conversion has already been notified and saved')) {
+        const responseBody = response.body || '';
+        if (responseBody.match('OK')) {
           return data.gtmOnSuccess();
+        } else if (responseBody.match('ERROR: Tag is invalid') && data.cookieSync) {
+          log({
+            Name: 'ExoClick',
+            Type: 'Message',
+            EventName: 'Conversion',
+            Message:
+              'Click ID is invalid. 3rd party cookie-syncing requests will try to be sent as fallback.',
+            Reason: responseBody
+          });
+          return sendCookieSyncPixel(conversionParametersForCookieSync)
+            ? data.gtmOnSuccess()
+            : data.gtmOnFailure();
         } else {
-          if (data.cookieSync && !data.useOptimisticScenario)
-            sendCookieSyncPixel(conversionParametersForCookieSync);
           return data.gtmOnFailure();
         }
       }
     })
     .catch((error) => {
       log({
-        Name: 'Exoclick',
+        Name: 'ExoClick',
         Type: 'Message',
         EventName: 'Conversion',
         Message: 'API call failed or timed out',
-        Reason: error
+        Reason: JSON.stringify(error)
       });
-      if (!data.useOptimisticScenario) {
-        return data.gtmOnFailure();
-      }
+      if (!data.useOptimisticScenario) return data.gtmOnFailure();
     });
 }
 
-function parseClickIdFromUrl(eventData) {
+function parseClickIdFromUrl(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
   if (!url) return;
 
@@ -104,27 +135,24 @@ function parseClickIdFromUrl(eventData) {
 function getClickId(data, eventData) {
   const clickId = data.hasOwnProperty('clickId')
     ? data.clickId
-    : parseClickIdFromUrl(eventData) || getCookieValues('_exoclick_cid')[0];
+    : parseClickIdFromUrl(data, eventData) || getCookieValues('_exoclick_cid')[0];
 
   return clickId;
 }
 
-function storeClickId() {
-  const url = eventData.page_location || getRequestHeader('referer');
-
-  if (!url) return data.gtmOnSuccess();
-
-  const clickId = getClickId(data, eventData);
-  const cookieOptions = {
-    domain: getCookieDomain(data),
-    samesite: 'Lax',
-    path: '/',
-    secure: true,
-    httpOnly: !!data.cookieHttpOnly,
-    'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
-  };
-
-  if (clickId) setCookie('_exoclick_cid', clickId, cookieOptions, false);
+function storeClickId(data, eventData) {
+  const clickId = parseClickIdFromUrl(data, eventData);
+  if (clickId) {
+    const cookieOptions = {
+      domain: getCookieDomain(data),
+      samesite: data.cookieSameSite || 'none',
+      path: '/',
+      secure: true,
+      httpOnly: !!data.cookieHttpOnly,
+      'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
+    };
+    setCookie('_exoclick_cid', clickId, cookieOptions, false);
+  }
 
   return data.gtmOnSuccess();
 }
@@ -140,12 +168,26 @@ function sendCookieSyncPixel(conversionParametersForCookieSync) {
     's.orbsrv.com',
     's.pemsrv.com',
     's.zlinkw.com',
+    's.magsrv.com',
     'syndication.realsrv.com'
   ];
+  let allSendPixelWereSuccessful = true;
   syncingDomainAliases.forEach((alias) => {
-    let url = 'https://' + alias + '/tag.php' + conversionParametersForCookieSync;
-    sendPixelFromBrowser(url);
+    const url = 'https://' + alias + '/tag.php' + conversionParametersForCookieSync;
+    if (!sendPixelFromBrowser(url)) allSendPixelWereSuccessful = false;
   });
+
+  if (!allSendPixelWereSuccessful) {
+    log({
+      Name: 'ExoClick',
+      Type: 'Message',
+      EventName: 'Conversion',
+      Message:
+        'The requestor does not support sending pixels from browser. 3rd party cookies will not be collected as a result.'
+    });
+  }
+
+  return allSendPixelWereSuccessful;
 }
 
 /*==============================================================================
@@ -179,7 +221,7 @@ function getCookieDomain(data) {
 }
 
 function enc(data) {
-  if (data === undefined || data === null) data = '';
+  if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
   return encodeUriComponent(makeString(data));
 }
 

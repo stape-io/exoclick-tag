@@ -1,27 +1,27 @@
-# Exoclick Tag for GTM Server-Side
+# ExoClick Tag for GTM Server-Side
 
-This server-side tag allows you to track Exoclick conversions via server-to-server (S2S) postbacks and handle Click ID storage directly from your Google Tag Manager Server container.
+This server-side tag allows you to track [ExoClick conversions](https://docs.exoclick.com/docs/conversion-tracking) via server-to-server (S2S) postbacks and handle Click ID storage directly from your Google Tag Manager Server container.
 
 ## Features
 
 - **Event Support**: Handles **Page View** (for storing Click IDs) and **Conversion** (for tracking goals).
 - **Cookie Management**: Automatically extracts the Click ID from the URL during a Page View and stores it as a first-party cookie.
-- **Cookie Syncing**: Optional feature to fire browser-side pixels to synchronize cookies across Exoclick domains.
+- **Cookie Syncing**: Optional feature to fire browser-side pixels to synchronize cookies across ExoClick domains when no Click ID is found in first-party cookie or the Click ID value is invalid.
 - **Optimistic Scenario**: Option to trigger `gtmOnSuccess()` immediately without waiting for the API response.
-- **BigQuery Logging**: Native support for streaming request and response data to BigQuery.
 
 ## Configuration
 
 ### 1. Event Type
 
-- **Page View**: Fires when a user reaches the landing page to store the Click ID.
-  - **Click ID Key**: The query parameter key for your `{conversions_tracking}` token (e.g., `exotracker`).
-  - **Cookie Settings**: Define **Expiration** (days), **Domain**, and **HttpOnly** flag for the Click ID cookie.
-- **Conversion**: Sends a postback to Exoclick.
-  - **Goal ID**: Found in the "ID" column of your Exoclick Conversion Tracking tab.
-  - **Click ID**: The unique tracking ID.
-  - **Conversion Value**: Choose **Fixed** (set in platform) or **Dynamic** (passed via variable).
-  - **Enable cookie syncing**: Check to send cookie-syncing pixels from the browser (e.g., to `s.chmsrv.com`, `s.pemsrv.com`, etc.).
+- **Page View**: Fires when a user reaches the landing page to store the Click ID in the `_exoclick_cid` first-party cookie.
+  - **Click ID URL Parameter Name**: The query parameter name for your `{conversions_tracking}` token (e.g., `exotracker`).
+  - **Cookie Settings**: Define **Expiration** (days), **Domain**, **SameSite** and **HttpOnly** flag for the Click ID cookie.
+- **Conversion**: Sends a postback to ExoClick.
+  - **Click ID URL Parameter Name**: The query parameter name for your `{conversions_tracking}` token (e.g., `exotracker`).
+  - **Goal ID**: Found in the "ID" column of your ExoClick Conversion Tracking tab.
+  - **Click ID Value**: The unique tracking ID. If not set, it will be automatically read from the `_exoclick_cid` first-party cookie.
+  - **Conversion Value**: Required in case you are using **dynamic values** on this Conversion Goal.
+  - **Enable cookie syncing**: Enables third-party cookie-syncing pixels from the browser (e.g., to `s.chmsrv.com`, `s.pemsrv.com`, etc.) if the server-side conversion request fails due to no available Click ID to be used or due to an invalid Click ID.
 
 ### 2. General Settings
 
@@ -36,16 +36,6 @@ This server-side tag allows you to track Exoclick conversions via server-to-serv
   - **Dataset ID**: Required.
   - **Table ID**: Required.
 
-## Permissions
-
-This template requires the following permissions:
-
-- **Send HTTP Requests**: Grants access to `https://s.magsrv.com/`.
-- **Send Pixels**: Grants access to Exoclick sync domains (e.g., `https://s.chmsrv.com/`, `https://s.ds10lf.com/`, etc.) if syncing is enabled.
-- **Set Cookies**: To store the Click ID.
-- **Access BigQuery**: Requires `write` access if BigQuery logging is enabled.
-- **Access to Global Variables**: Reads event data, container version, and request headers.
-
 ## Open Source
 
-The **Exoclick Tag for GTM Server Side** is developed and maintained by the [Stape Team](https://stape.io/) under the Apache 2.0 license.
+The **ExoClick Tag for GTM Server Side** is developed and maintained by the [Stape Team](https://stape.io/) under the Apache 2.0 license.
