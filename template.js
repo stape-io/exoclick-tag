@@ -1,28 +1,33 @@
 const BigQuery = require('BigQuery');
+const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
 const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
+const getCookieValues = require('getCookieValues');
 const getContainerVersion = require('getContainerVersion');
+const getEventData = require('getEventData');
 const getRequestHeader = require('getRequestHeader');
 const getTimestampMillis = require('getTimestampMillis');
+const getType = require('getType');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
-const makeString = require('makeString');
 const makeInteger = require('makeInteger');
-const setCookie = require('setCookie');
+const makeString = require('makeString');
 const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
 const sendPixelFromBrowser = require('sendPixelFromBrowser');
+const setCookie = require('setCookie');
 
 /*==============================================================================
 ==============================================================================*/
 
 const eventData = getAllEventData();
 
-if(checkGuardClauses(data,eventData)) return;
+if (checkGuardClauses(data, eventData)) return;
 
-if(data.type === 'pageview') return storeClickId(data.clickIdKey);
-
-sendConversion(data);
+if (data.type === 'pageview') return storeClickId();
+else {
+  sendConversion(data);
+}
 
 if (data.useOptimisticScenario) {
   return data.gtmOnSuccess();
@@ -35,62 +40,83 @@ if (data.useOptimisticScenario) {
 function sendConversion(data) {
   const goal = data.conversionId;
   const clickId = data.clickId;
-  let requestUrl = 'https://s.magsrv.com/tag.php?' + 'goal=' + enc(goal) + '&tag=' + enc(clickId);
+  let conversionParameters = '?goal=' + enc(goal);
+  if (isValidValue(data.conversionValue))
+    conversionParameters += '&value=' + enc(data.conversionValue);
+  const conversionParametersForCookieSync = conversionParameters;
+  conversionParameters += '&tag=' + enc(clickId);
+  const requestUrl = 'https://s.magsrv.com/tag.php' + conversionParameters;
   const requestOptions = {
-    method: "GET"
+    method: 'GET'
   };
-  
-  if(data.conversionValue === 'dynamic') requestUrl += '&value=' + enc(makeString(data.value));
-  if(data.cookieSync) sendCookieSyncPixel(goal, data.value);
 
   log({
     Name: 'Exoclick',
     Type: 'Request',
     EventName: 'Conversion',
     RequestMethod: requestOptions.method,
-    RequestUrl: requestUrl,
-    RequestBody: ''
+    RequestUrl: requestUrl
   });
-  
+
   return sendHttpRequest(requestUrl, requestOptions)
-  .then(response => {
-       log({
+    .then((response) => {
+      log({
         Name: 'Exoclick',
         Type: 'Response',
         EventName: 'Conversion',
         ResponseStatusCode: response.statusCode,
         ResponseHeaders: response.headers,
         ResponseBody: response.body
-      });  
-    
-    if(response.body.match('ERROR')) {
-      return data.gtmOnFailure();
-    }
-    else {
-      return data.gtmOnSuccess();
-    }
-  })
-  .catch(error => {
-       log({
+      });
+
+      if (!data.useOptimisticScenario) {
+        if (response.body.match('OK|ERROR: This conversion has already been notified and saved')) {
+          return data.gtmOnSuccess();
+        } else {
+          if (data.cookieSync && !data.useOptimisticScenario)
+            sendCookieSyncPixel(conversionParametersForCookieSync);
+          return data.gtmOnFailure();
+        }
+      }
+    })
+    .catch((error) => {
+      log({
         Name: 'Exoclick',
         Type: 'Message',
         EventName: 'Conversion',
         Message: 'API call failed or timed out',
         Reason: error
       });
-    return data.gtmOnFailure();
-  });
+      if (!data.useOptimisticScenario) {
+        return data.gtmOnFailure();
+      }
+    });
 }
 
-function storeClickId(key){  
+function parseClickIdFromUrl(eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
+  if (!url) return;
+
   const urlSearchParams = parseUrl(url).searchParams;
-  const clickId = urlSearchParams[data.clickIdKey];
- 
+  return urlSearchParams[data.clickIdKey];
+}
+
+function getClickId(data, eventData) {
+  const clickId = data.hasOwnProperty('clickId')
+    ? data.clickId
+    : parseClickIdFromUrl(eventData) || getCookieValues('_exoclick_cid')[0];
+
+  return clickId;
+}
+
+function storeClickId() {
+  const url = eventData.page_location || getRequestHeader('referer');
+
   if (!url) return data.gtmOnSuccess();
 
+  const clickId = getClickId(data, eventData);
   const cookieOptions = {
-    domain: data.cookieDomain || 'auto',
+    domain: getCookieDomain(data),
     samesite: 'Lax',
     path: '/',
     secure: true,
@@ -98,16 +124,26 @@ function storeClickId(key){
     'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
   };
 
-  if (clickId) setCookie(data.clickIdKey, clickId, cookieOptions, false);
+  if (clickId) setCookie('_exoclick_cid', clickId, cookieOptions, false);
 
-  return data.gtmOnSuccess();  
+  return data.gtmOnSuccess();
 }
 
-function sendCookieSyncPixel(conversionId,value){
-  const syncingDomainAliases = ["s.chmsrv.com", "s.chnsrv.com", "s.ds10lf.com", "s.ds165z.com", "s.eln7dc.com", "s.opoxv.com", "s.orbsrv.com", "s.pemsrv.com", "s.zlinkw.com", "syndication.realsrv.com"];
-  syncingDomainAliases.forEach(alias => {
-    let url = 'https://' + alias + '/tag.php?' + 'goal=' +enc(conversionId);
-    if(value) url+= '&value='+value;
+function sendCookieSyncPixel(conversionParametersForCookieSync) {
+  const syncingDomainAliases = [
+    's.chmsrv.com',
+    's.chnsrv.com',
+    's.ds10lf.com',
+    's.ds165z.com',
+    's.eln7dc.com',
+    's.opoxv.com',
+    's.orbsrv.com',
+    's.pemsrv.com',
+    's.zlinkw.com',
+    'syndication.realsrv.com'
+  ];
+  syncingDomainAliases.forEach((alias) => {
+    let url = 'https://' + alias + '/tag.php' + conversionParametersForCookieSync;
     sendPixelFromBrowser(url);
   });
 }
@@ -116,16 +152,30 @@ function sendCookieSyncPixel(conversionId,value){
   Helpers
 ==============================================================================*/
 
-function checkGuardClauses(data,eventData) {
+function checkGuardClauses(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
 
   if (!isConsentGivenOrNotRequired(data, eventData)) {
-    return data.gtmOnSuccess();
+    data.gtmOnSuccess();
+    return true;
   }
 
   if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
-    return data.gtmOnSuccess();
+    data.gtmOnSuccess();
+    return true;
   }
+}
+
+function isValidValue(value) {
+  const valueType = getType(value);
+  return valueType !== 'null' && valueType !== 'undefined' && value !== '';
+}
+
+function getCookieDomain(data) {
+  return !data.cookieDomain || data.cookieDomain === 'auto'
+    ? computeEffectiveTldPlusOne(getEventData('page_location') || getRequestHeader('referer')) ||
+        'auto'
+    : data.cookieDomain;
 }
 
 function enc(data) {

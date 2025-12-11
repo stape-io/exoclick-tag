@@ -49,7 +49,7 @@ ___TEMPLATE_PARAMETERS___
             "value": "pageview",
             "displayValue": "Page View",
             "subParams": [],
-            "help": "Fire this event when the customer reaches your landing page in order to store on cookie the \u003cb\u003e click ID \u003c/b\u003e from your ad destination URL. This cookie value can be later used to populate the conversion event."
+            "help": "Fire this event when the customer reaches your landing page in order to store the \u003cb\u003e click ID \u003c/b\u003e from your ad destination URL on the cookie \u003cb\u003e_exoclick_cid\u003c/b\u003e. This cookie value can be later used to populate the conversion event."
           },
           {
             "value": "conversion",
@@ -171,7 +171,7 @@ ___TEMPLATE_PARAMETERS___
         "name": "clickId",
         "displayName": "Click ID",
         "simpleValueType": true,
-        "help": "Your defined ad click ID. It must carry the value of your \u003cb\u003e{conversions_tracking}\u003c/b\u003e ad destination token. If you are firing a Page View, this value will be stored as a first party cookie having the same name you defined on the platform. In the example below the cookie named \u003cb\u003eexotracker\u003c/b\u003e will retrieve the correct value.\n\u003c/br\u003e\n\u003c/br\u003e\n\u003ci\u003e(E.g. http://www.yoursite.com/?\u003cb\u003eexotracker\u003c/b\u003e\u003d{conversions_tracking}\u003c/i\u003e\n\u003c/br\u003e\n\u003c/br\u003e\nYou can find an example of this value while editing your campaign Ads by clicking on the \"Test Variation\" icon present in one of your listed ads. You will notice that the link takes you to the ad target landing page, with the URL decorated with your click-ID. \n\u003c/br\u003e\nCheck \u003ca href\u003d\"https://docs.exoclick.com/docs/conversion-tracking/\"\u003e documentation \u003c/a\u003e for more information.",
+        "help": "Your defined ad click ID. It must carry the value of your \u003cb\u003e{conversions_tracking}\u003c/b\u003e ad destination token. If you are firing a Page View, this value will be stored as a first party cookie named \u003cb\u003e_exoclick_cid\u003c/b\u003e.\n\u003c/br\u003e\n\u003c/br\u003e\nYou can find an example of this value while editing your campaign Ads by clicking on the \"Test Variation\" icon present in one of your listed ads. You will notice that the link takes you to the ad target landing page, with the URL decorated with your click-ID. \n\u003c/br\u003e\nCheck \u003ca href\u003d\"https://docs.exoclick.com/docs/conversion-tracking/\"\u003e documentation \u003c/a\u003e for more information.",
         "valueValidators": [
           {
             "type": "NON_EMPTY"
@@ -179,36 +179,16 @@ ___TEMPLATE_PARAMETERS___
         ]
       },
       {
-        "type": "RADIO",
+        "type": "TEXT",
         "name": "conversionValue",
-        "displayName": "Conversion Value",
-        "radioItems": [
-          {
-            "value": "fixed",
-            "displayValue": "Fixed Value",
-            "help": "Select this option if your Goal was created with a fixed value in the platform. You can find this at your Conversion Tracking tab in your Exoclick account."
-          },
-          {
-            "value": "dynamic",
-            "displayValue": "Dynamic Value",
-            "subParams": [
-              {
-                "type": "TEXT",
-                "name": "value",
-                "displayName": "Conversion Value",
-                "simpleValueType": true,
-                "valueValidators": [
-                  {
-                    "type": "NON_EMPTY"
-                  }
-                ]
-              }
-            ],
-            "help": "Select this option if your Goal has dynamic values and add your value variable on the field below"
-          }
-        ],
+        "displayName": "Conversion Value (for dynamic values)",
         "simpleValueType": true,
-        "subParams": []
+        "help": "The conversion value, in case you are using dynamic values on this conversion. If your conversion has a fixed value you can leave this field empty.",
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          }
+        ]
       },
       {
         "type": "CHECKBOX",
@@ -216,15 +196,21 @@ ___TEMPLATE_PARAMETERS___
         "checkboxText": "Enable cookie syncing",
         "simpleValueType": true,
         "help": "Check this box if you want to send cookie-syncing pixels from the browser. Note that this is already done by the Exoclick Javascript client-side code, so use wisely and avoid duplicates.",
-        "defaultValue": false
+        "defaultValue": true,
+        "enablingConditions": [
+          {
+            "paramName": "useOptimisticScenario",
+            "paramValue": true,
+            "type": "NOT_EQUALS"
+          }
+        ]
       },
       {
         "type": "CHECKBOX",
         "name": "useOptimisticScenario",
         "checkboxText": "Use Optimistic Scenario",
         "simpleValueType": true,
-        "help": "The tag will call gtmOnSuccess() without waiting for a response from the API. This will speed up sGTM response time however your tag will always return the status fired successfully even in case it is not.",
-        "defaultValue": false
+        "help": "The tag will call gtmOnSuccess() without waiting for a response from the API. This will speed up sGTM response time however your tag will always return the status fired successfully even in case it is not."
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
@@ -287,6 +273,13 @@ ___TEMPLATE_PARAMETERS___
         ],
         "simpleValueType": true,
         "defaultValue": "debug"
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "type",
+        "paramValue": "conversion",
+        "type": "EQUALS"
       }
     ]
   },
@@ -355,6 +348,13 @@ ___TEMPLATE_PARAMETERS___
           }
         ]
       }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "type",
+        "paramValue": "conversion",
+        "type": "EQUALS"
+      }
     ]
   }
 ]
@@ -363,30 +363,35 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 const BigQuery = require('BigQuery');
+const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
 const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
+const getCookieValues = require('getCookieValues');
 const getContainerVersion = require('getContainerVersion');
+const getEventData = require('getEventData');
 const getRequestHeader = require('getRequestHeader');
 const getTimestampMillis = require('getTimestampMillis');
+const getType = require('getType');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
-const makeString = require('makeString');
 const makeInteger = require('makeInteger');
-const setCookie = require('setCookie');
+const makeString = require('makeString');
 const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
 const sendPixelFromBrowser = require('sendPixelFromBrowser');
+const setCookie = require('setCookie');
 
 /*==============================================================================
 ==============================================================================*/
 
 const eventData = getAllEventData();
 
-if(checkGuardClauses(data,eventData)) return;
+if (checkGuardClauses(data, eventData)) return;
 
-if(data.type === 'pageview') return storeClickId(data.clickIdKey);
-
-sendConversion(data);
+if (data.type === 'pageview') return storeClickId();
+else {
+  sendConversion(data);
+}
 
 if (data.useOptimisticScenario) {
   return data.gtmOnSuccess();
@@ -399,62 +404,83 @@ if (data.useOptimisticScenario) {
 function sendConversion(data) {
   const goal = data.conversionId;
   const clickId = data.clickId;
-  let requestUrl = 'https://s.magsrv.com/tag.php?' + 'goal=' + enc(goal) + '&tag=' + enc(clickId);
+  let conversionParameters = '?goal=' + enc(goal);
+  if (isValidValue(data.conversionValue))
+    conversionParameters += '&value=' + enc(data.conversionValue);
+  const conversionParametersForCookieSync = conversionParameters;
+  conversionParameters += '&tag=' + enc(clickId);
+  const requestUrl = 'https://s.magsrv.com/tag.php' + conversionParameters;
   const requestOptions = {
-    method: "GET"
+    method: 'GET'
   };
-  
-  if(data.conversionValue === 'dynamic') requestUrl += '&value=' + enc(makeString(data.value));
-  if(data.cookieSync) sendCookieSyncPixel(goal, data.value);
 
   log({
     Name: 'Exoclick',
     Type: 'Request',
     EventName: 'Conversion',
     RequestMethod: requestOptions.method,
-    RequestUrl: requestUrl,
-    RequestBody: ''
+    RequestUrl: requestUrl
   });
-  
+
   return sendHttpRequest(requestUrl, requestOptions)
-  .then(response => {
-       log({
+    .then((response) => {
+      log({
         Name: 'Exoclick',
         Type: 'Response',
         EventName: 'Conversion',
         ResponseStatusCode: response.statusCode,
         ResponseHeaders: response.headers,
         ResponseBody: response.body
-      });  
-    
-    if(response.body.match('ERROR')) {
-      return data.gtmOnFailure();
-    }
-    else {
-      return data.gtmOnSuccess();
-    }
-  })
-  .catch(error => {
-       log({
+      });
+
+      if (!data.useOptimisticScenario) {
+        if (response.body.match('OK|ERROR: This conversion has already been notified and saved')) {
+          return data.gtmOnSuccess();
+        } else {
+          if (data.cookieSync && !data.useOptimisticScenario)
+            sendCookieSyncPixel(conversionParametersForCookieSync);
+          return data.gtmOnFailure();
+        }
+      }
+    })
+    .catch((error) => {
+      log({
         Name: 'Exoclick',
         Type: 'Message',
         EventName: 'Conversion',
         Message: 'API call failed or timed out',
         Reason: error
       });
-    return data.gtmOnFailure();
-  });
+      if (!data.useOptimisticScenario) {
+        return data.gtmOnFailure();
+      }
+    });
 }
 
-function storeClickId(key){  
+function parseClickIdFromUrl(eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
+  if (!url) return;
+
   const urlSearchParams = parseUrl(url).searchParams;
-  const clickId = urlSearchParams[data.clickIdKey];
- 
+  return urlSearchParams[data.clickIdKey];
+}
+
+function getClickId(data, eventData) {
+  const clickId = data.hasOwnProperty('clickId')
+    ? data.clickId
+    : parseClickIdFromUrl(eventData) || getCookieValues('_exoclick_cid')[0];
+
+  return clickId;
+}
+
+function storeClickId() {
+  const url = eventData.page_location || getRequestHeader('referer');
+
   if (!url) return data.gtmOnSuccess();
 
+  const clickId = getClickId(data, eventData);
   const cookieOptions = {
-    domain: data.cookieDomain || 'auto',
+    domain: getCookieDomain(data),
     samesite: 'Lax',
     path: '/',
     secure: true,
@@ -462,16 +488,26 @@ function storeClickId(key){
     'max-age': 60 * 60 * 24 * (makeInteger(data.cookieExpiration) || 365)
   };
 
-  if (clickId) setCookie(data.clickIdKey, clickId, cookieOptions, false);
+  if (clickId) setCookie('_exoclick_cid', clickId, cookieOptions, false);
 
-  return data.gtmOnSuccess();  
+  return data.gtmOnSuccess();
 }
 
-function sendCookieSyncPixel(conversionId,value){
-  const syncingDomainAliases = ["s.chmsrv.com", "s.chnsrv.com", "s.ds10lf.com", "s.ds165z.com", "s.eln7dc.com", "s.opoxv.com", "s.orbsrv.com", "s.pemsrv.com", "s.zlinkw.com", "syndication.realsrv.com"];
-  syncingDomainAliases.forEach(alias => {
-    let url = 'https://' + alias + '/tag.php?' + 'goal=' +enc(conversionId);
-    if(value) url+= '&value='+value;
+function sendCookieSyncPixel(conversionParametersForCookieSync) {
+  const syncingDomainAliases = [
+    's.chmsrv.com',
+    's.chnsrv.com',
+    's.ds10lf.com',
+    's.ds165z.com',
+    's.eln7dc.com',
+    's.opoxv.com',
+    's.orbsrv.com',
+    's.pemsrv.com',
+    's.zlinkw.com',
+    'syndication.realsrv.com'
+  ];
+  syncingDomainAliases.forEach((alias) => {
+    let url = 'https://' + alias + '/tag.php' + conversionParametersForCookieSync;
     sendPixelFromBrowser(url);
   });
 }
@@ -480,16 +516,30 @@ function sendCookieSyncPixel(conversionId,value){
   Helpers
 ==============================================================================*/
 
-function checkGuardClauses(data,eventData) {
+function checkGuardClauses(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
 
   if (!isConsentGivenOrNotRequired(data, eventData)) {
-    return data.gtmOnSuccess();
+    data.gtmOnSuccess();
+    return true;
   }
 
   if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
-    return data.gtmOnSuccess();
+    data.gtmOnSuccess();
+    return true;
   }
+}
+
+function isValidValue(value) {
+  const valueType = getType(value);
+  return valueType !== 'null' && valueType !== 'undefined' && value !== '';
+}
+
+function getCookieDomain(data) {
+  return !data.cookieDomain || data.cookieDomain === 'auto'
+    ? computeEffectiveTldPlusOne(getEventData('page_location') || getRequestHeader('referer')) ||
+        'auto'
+    : data.cookieDomain;
 }
 
 function enc(data) {
@@ -868,7 +918,7 @@ ___SERVER_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "*"
+                    "string": "_exoclick_cid"
                   },
                   {
                     "type": 1,
@@ -939,10 +989,6 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
-                "string": "https://s.magsrv.com/*"
-              },
-              {
-                "type": 1,
                 "string": "https://s.opoxv.com/*"
               },
               {
@@ -970,456 +1016,51 @@ ___SERVER_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "get_cookies",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "cookieAccess",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        },
+        {
+          "key": "cookieNames",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "_exoclick_cid"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
 
 ___TESTS___
 
-scenarios:
-- name: '[Page View] Tag is not executed when Tag Execution Consent is Denied'
-  code: |-
-    setGetAllEventData({
-      'x-ga-gcs': 'G100'
-    });
-    setAllMockDataByEventType('pageView', {
-      adStorageConsent: 'required'
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-    assertApi('getCookieValues').wasNotCalled();
-    assertApi('setCookie').wasNotCalled();
-    assertApi('sendHttpRequest').wasNotCalled();
-- name: '[Page View] Click ID cookie is NOT set if URL doesn''t contain it'
-  code: |-
-    setAllMockDataByEventType('pageView');
-
-    mock('getAllEventData', {
-      page_location: 'https://example.com/'
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-    assertApi('setCookie').wasNotCalled();
-- name: '[Page View] Click ID cookie is set if URL contains it'
-  code: |-
-    setAllMockDataByEventType('pageView');
-
-    const expectedCookieOptions = {
-      domain: 'auto',
-      samesite: 'none',
-      path: '/',
-      secure: true,
-      httpOnly: false,
-      'max-age': 2592000
-    };
-
-    mock('getAllEventData', {
-      page_location: 'https://example.com/?utm_source=effinity&eff_cpt=eff_cptValue&eff_sub1=eff_sub1Value&eff_sub2=eff_sub2Value&eff_pid=eff_pidValue&eff_pcid=eff_pcidValue&eff_pcuid=eff_pcuidValue&eff_pr1=eff_pr1Value'
-    });
-
-    mock('setCookie', () => {
-      const cookieName = arguments[0];
-      const cookieValue = arguments[1];
-      const cookieOptions = arguments[2];
-      const noEncode = arguments[3];
-      assertThat(cookieName).isEqualTo('eff_cid');
-      assertThat(JSON.parse(cookieValue)).isEqualTo({
-        id_compteur: 'eff_cptValue',
-        effi_id: 'eff_sub1Value',
-        effi_id2: 'eff_sub2Value',
-        prod_id: 'eff_pidValue',
-        effi_pcid: 'eff_pcidValue',
-        effi_pcuid: 'eff_pcuidValue',
-        effi_param1: 'eff_pr1Value'
-      });
-      assertThat(cookieOptions).isEqualTo(expectedCookieOptions);
-      assertThat(noEncode).isFalse();
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Page View] Click ID Cookie settings are overwritten'
-  code: |-
-    const cookieDomain = 'example.com';
-    const cookieHttpOnly = false;
-    const maxAgeDays = 1;
-
-    const expectedOverwrittenCookieOptions = {
-      domain: cookieDomain,
-      samesite: 'lax',
-      path: '/',
-      secure: true,
-      httpOnly: cookieHttpOnly,
-      'max-age': 60 * 60 * 24 * maxAgeDays
-    };
-
-    setAllMockDataByEventType('pageView', {
-      cookieDomain: cookieDomain,
-      cookieSameSite: 'lax',
-      cookieExpiration: maxAgeDays,
-      cookieHttpOnly: cookieHttpOnly
-    });
-
-    mock('getAllEventData', {
-      page_location: 'https://example.com/?utm_source=effinity&eff_cpt=eff_cptValue&eff_sub1=eff_sub1Value&eff_sub2=eff_sub2Value&eff_pid=eff_pidValue&eff_pcid=eff_pcidValue&eff_pcuid=eff_pcuidValue&eff_pr1=eff_pr1Value'});
-
-    mock('setCookie', () => {
-      const cookieName = arguments[0];
-      const cookieValue = arguments[1];
-      const cookieOptions = arguments[2];
-      const noEncode = arguments[3];
-      assertThat(cookieName).isEqualTo('eff_cid');
-      assertThat(JSON.parse(cookieValue)).isEqualTo({
-        id_compteur: 'eff_cptValue',
-        effi_id: 'eff_sub1Value',
-        effi_id2: 'eff_sub2Value',
-        prod_id: 'eff_pidValue',
-        effi_pcid: 'eff_pcidValue',
-        effi_pcuid: 'eff_pcuidValue',
-        effi_param1: 'eff_pr1Value'
-      });
-      assertThat(cookieOptions).isEqualTo(expectedOverwrittenCookieOptions);
-      assertThat(noEncode).isFalse();
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion] Tag is not executed when Tag Execution Consent is Denied'
-  code: |-
-    setGetAllEventData({
-      'x-ga-gcs': 'G100'
-    });
-    setAllMockDataByEventType('conversion_sale', {
-      adStorageConsent: 'required'
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-    assertApi('getCookieValues').wasNotCalled();
-    assertApi('setCookie').wasNotCalled();
-    assertApi('sendHttpRequest').wasNotCalled();
-- name: '[Conversion Lead] Request is not sent if required parameters are missing'
-  code: "const originalMockData = setAllMockDataByEventType('conversion_lead');\n\n\
-    [\n  { consentPerformance: undefined },\n  { effinityId: undefined },\n  { idCompteur:\
-    \ undefined },\n  { orderOrLeadId: undefined }\n].forEach((scenario) => {\n  const\
-    \ copyMockData = JSON.parse(JSON.stringify(originalMockData));\n  mergeObj(copyMockData,\
-    \ scenario);\n  \n  runCode(copyMockData);\n  \n  assertApi('sendHttpRequest').wasNotCalled();\n\
-    \  assertApi('gtmOnSuccess').wasNotCalled();\n  assertApi('gtmOnFailure').wasCalled();\n\
-    });\n"
-- name: '[Conversion Sale] Request is not sent if required parameters are missing'
-  code: "const originalMockData = setAllMockDataByEventType('conversion_sale');\n\n\
-    [\n  { consentPerformance: undefined },\n  { effinityId: undefined },\n  { idCompteur:\
-    \ undefined },\n  { orderOrLeadId: undefined },\n  { currency: undefined },\n\
-    \  { value: undefined },\n  { voucher: undefined }\n].forEach((scenario) => {\n\
-    \  const copyMockData = JSON.parse(JSON.stringify(originalMockData));\n  mergeObj(copyMockData,\
-    \ scenario);\n  \n  runCode(copyMockData);\n  \n  assertApi('sendHttpRequest').wasNotCalled();\n\
-    \  assertApi('gtmOnSuccess').wasNotCalled();\n  assertApi('gtmOnFailure').wasCalled();\n\
-    });\n"
-- name: '[Conversion Lead] Request Base URL is correctly built'
-  code: |-
-    setAllMockDataByEventType('conversion_lead');
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      const parsedUrl = parseUrl(requestUrl);
-      assertThat(parsedUrl.origin + parsedUrl.pathname).isEqualTo('https://track.effiliation.com/servlet/effi.leadmobile');
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion Sale] Request Base URL is correctly built'
-  code: |-
-    setAllMockDataByEventType('conversion_sale');
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      const parsedUrl = parseUrl(requestUrl);
-      assertThat(parsedUrl.origin + parsedUrl.pathname).isEqualTo('https://track.effiliation.com/servlet/effi.revenuemobile');
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion] Request Options is correctly built'
-  code: |-
-    setAllMockDataByEventType('conversion_sale');
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      assertThat(requestOptions).isEqualTo({
-        method: 'GET'
-      });
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion Lead] [Data from UI fields] Request is successfully built and
-    sent'
-  code: |-
-    setAllMockDataByEventType('conversion_lead', {
-      autoMapData: false
-    });
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      assertThat(requestUrl).isEqualTo('https://track.effiliation.com/servlet/effi.leadmobile?id=effinityId&origin=stape_s2s&ref=leadId&consent_performance=1&attrib=2&date=2025-12-31&ref2=123&id_compteur=eff_cpt&effi_id=eff_sub1&effi_id2=eff_sub2&prod_id=eff_pid&effi_pcid=eff_pcid&effi_pcuid=eff_pcuid&effi_param1=eff_pr1');
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion Lead] [Data from UI fields fallbacks] Request is successfully
-    built and sent'
-  code: |-
-    setAllMockDataByEventType('conversion_lead', {
-      autoMapData: true
-    });
-
-    ['orderOrLeadId', 'idCompteur', 'effiId', 'effiId2', 'prodId', 'effiPcid', 'effiPcuid', 'effiParam1'].forEach(p => Object.delete(mockData, p));
-
-    setGetAllEventData();
-
-    mock('getCookieValues', (cookieName) => {
-      if (cookieName === 'eff_cid') {
-        return [
-          JSON.stringify({
-            id_compteur: 'eff_cpt_from_cookie',
-            effi_id: 'eff_sub1_from_cookie',
-            effi_id2: 'eff_sub2_from_cookie',
-            prod_id: 'eff_pid_from_cookie',
-            effi_pcid: 'eff_pcid_from_cookie',
-            effi_pcuid: 'eff_pcuid_from_cookie',
-            effi_param1: 'eff_pr1_from_cookie'
-          })
-        ];
-      }
-      return [];
-    });
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      assertThat(requestUrl).isEqualTo('https://track.effiliation.com/servlet/effi.leadmobile?id=effinityId&origin=stape_s2s&ref=transactionId&consent_performance=1&attrib=2&date=2025-12-31&ref2=123&id_compteur=eff_cpt_from_cookie&effi_id=eff_sub1_from_cookie&effi_id2=eff_sub2_from_cookie&prod_id=eff_pid_from_cookie&effi_pcid=eff_pcid_from_cookie&effi_pcuid=eff_pcuid_from_cookie&effi_param1=eff_pr1_from_cookie');
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion Sale] [Data from UI fields] Request is successfully built and
-    sent'
-  code: |-
-    setAllMockDataByEventType('conversion_sale', {
-      autoMapData: false
-    });
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      assertThat(requestUrl).isEqualTo("https://track.effiliation.com/servlet/effi.revenuemobile?id=effinityId&origin=stape_s2s&ref=orderId&montant=value&monnaie=currency&voucher=voucher&payment=paymentype&newcustomer=1&cart_detail=%5B%7B%22id%22%3A%22SKU_12345%22%2C%22name%22%3A%22Stan%20and%20Friends%20Tee%22%2C%22price%22%3A10.01%2C%22quantity%22%3A3%7D%2C%7B%22id%22%3A%22SKU_12346%22%2C%22name%22%3A%22Google%20Grey%20Women's%20(Tee)%22%2C%22price%22%3A21.01%2C%22quantity%22%3A2%7D%5D&consent_performance=1&attrib=2&date=2025-12-31&ref2=123&id_compteur=eff_cpt&effi_id=eff_sub1&effi_id2=eff_sub2&prod_id=eff_pid&effi_pcid=eff_pcid&effi_pcuid=eff_pcuid&effi_param1=eff_pr1");
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion Sale] [Data from UI fields fallbacks] Request is successfully
-    built and sent'
-  code: |-
-    setAllMockDataByEventType('conversion_sale', {
-      autoMapData: true
-    });
-
-    ['orderOrLeadId', 'value', 'currency', 'voucher', 'paymentType', 'newCustomer', 'cart', 'idCompteur', 'effiId', 'effiId2', 'prodId', 'effiPcid', 'effiPcuid', 'effiParam1'].forEach(p => Object.delete(mockData, p));
-
-    setGetAllEventData();
-
-    mock('getCookieValues', (cookieName) => {
-      if (cookieName === 'eff_cid') {
-        return [
-          JSON.stringify({
-            id_compteur: 'eff_cpt_from_cookie',
-            effi_id: 'eff_sub1_from_cookie',
-            effi_id2: 'eff_sub2_from_cookie',
-            prod_id: 'eff_pid_from_cookie',
-            effi_pcid: 'eff_pcid_from_cookie',
-            effi_pcuid: 'eff_pcuid_from_cookie',
-            effi_param1: 'eff_pr1_from_cookie'
-          })
-        ];
-      }
-      return [];
-    });
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      assertThat(requestUrl).isEqualTo("https://track.effiliation.com/servlet/effi.revenuemobile?id=effinityId&origin=stape_s2s&ref=transactionId&montant=123.45&monnaie=BRL&voucher=coupon&payment=card&newcustomer=1&cart_detail=%5B%7B%22id%22%3A%22SKU_12345%22%2C%22name%22%3A%22Stan%20and%20Friends%20Tee%22%2C%22price%22%3A10.01%2C%22quantity%22%3A3%7D%2C%7B%22id%22%3A%22SKU_12346%22%2C%22name%22%3A%22Google%20Grey%20Women's%20(Tee)%22%2C%22price%22%3A21.01%2C%22quantity%22%3A2%7D%5D&consent_performance=1&attrib=2&date=2025-12-31&ref2=123&id_compteur=eff_cpt_from_cookie&effi_id=eff_sub1_from_cookie&effi_id2=eff_sub2_from_cookie&prod_id=eff_pid_from_cookie&effi_pcid=eff_pcid_from_cookie&effi_pcuid=eff_pcuid_from_cookie&effi_param1=eff_pr1_from_cookie");
-      callback(200);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('gtmOnFailure').wasNotCalled();
-- name: '[Conversion] Failure handler is called if response status code is outside
-    success range'
-  code: |-
-    setAllMockDataByEventType('conversion_sale');
-
-    mock('sendHttpRequest', (requestUrl, callback, requestOptions, requestBody) => {
-      callback(500);
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasNotCalled();
-    assertApi('gtmOnFailure').wasCalled();
-- name: '[Logs] Should log to console'
-  code: "const originalMockData = setAllMockDataByEventType('conversion_sale');\n\n\
-    [\n  // if the 'Always log to console' option is selected\n  { mockData: { logType:\
-    \ 'always' }, expectedDebugMode: true },\n  // if the 'Log during debug and preview'\
-    \ option is selected AND is on preview mode\n  { mockData: { logType: 'debug'\
-    \ }, expectedDebugMode: true },\n].forEach(scenario => {\n  const copyMockData\
-    \ = JSON.parse(JSON.stringify(originalMockData));\n  mergeObj(copyMockData, scenario.mockData);\n\
-    \  \n  mock('getContainerVersion', () => {\n    return {\n      debugMode: scenario.expectedDebugMode\n\
-    \    };\n  }); \n  \n  mock('logToConsole', (logData) => {\n    const parsedLogData\
-    \ = JSON.parse(logData);\n    requiredConsoleKeys.forEach(p => assertThat(parsedLogData[p]).isDefined());\n\
-    \  });\n  \n  runCode(copyMockData);\n  \n  assertApi('logToConsole').wasCalled();\n\
-    \  assertApi('gtmOnSuccess').wasCalled();\n  assertApi('gtmOnFailure').wasNotCalled();\n\
-    });"
-- name: '[Logs] Should NOT log to console'
-  code: "const originalMockData = setAllMockDataByEventType('conversion_sale');\n\n\
-    [\n  // if the 'Log during debug and preview' option is selected AND is NOT on\
-    \ preview mode\n  { mockData: { logType: 'debug' }, expectedDebugMode: false },\n\
-    \  // if the 'Do not log' option is selected\n  { mockData: { logType: 'no' },\
-    \ expectedDebugMode: undefined },\n].forEach(scenario => {\n  const copyMockData\
-    \ = JSON.parse(JSON.stringify(originalMockData));\n  mergeObj(copyMockData, scenario.mockData);\n\
-    \  \n  mock('getContainerVersion', () => {\n    return {\n      debugMode: scenario.expectedDebugMode\n\
-    \    };\n  });\n  \n  runCode(copyMockData);\n\n  assertApi('logToConsole').wasNotCalled();\n\
-    \  assertApi('gtmOnSuccess').wasCalled();\n  assertApi('gtmOnFailure').wasNotCalled();\n\
-    });"
-- name: '[Logs] Should log to BQ, if the ''Log to BigQuery'' option is selected'
-  code: "setAllMockDataByEventType('conversion_sale');\n\nmockData.bigQueryLogType\
-    \ = 'always';\n\nmockObject('BigQuery', {\n  insert: (connectionInfo, rows, options)\
-    \ => { \n    assertThat(connectionInfo).isDefined();\n    assertThat(rows).isArray();\n\
-    \    assertThat(rows).hasLength(1);\n    requiredBqKeys.forEach(p => assertThat(rows[0][p]).isDefined());\n\
-    \    assertThat(options).isEqualTo(expectedBqOptions);\n    return Promise.create((resolve,\
-    \ reject) => {\n      resolve();\n    });\n  }\n});\n\nrunCode(mockData);\n\n\
-    assertApi('gtmOnSuccess').wasCalled();\nassertApi('gtmOnFailure').wasNotCalled();\n"
-- name: '[Logs] Should NOT log to BQ, if the ''Do not log to BigQuery'' option is
-    selected'
-  code: "setAllMockDataByEventType('conversion_sale');\n\nmockData.bigQueryLogType\
-    \ = 'no';\n\n// assertApi doesn't work for 'BigQuery.insert()'.\n// Ref: https://gtm-gear.com/posts/gtm-templates-testing/\n\
-    mockObject('BigQuery', {\n  insert: (connectionInfo, rows, options) => { \n  \
-    \  fail('BigQuery.insert should not have been called.');\n    return Promise.create((resolve,\
-    \ reject) => {\n      resolve();\n    });\n  }\n});\n\nrunCode(mockData);\n\n\
-    assertApi('gtmOnSuccess').wasCalled();\nassertApi('gtmOnFailure').wasNotCalled();"
-setup: "const JSON = require('JSON');\nconst Promise = require('Promise');\nconst\
-  \ parseUrl = require('parseUrl');\nconst Object = require('Object');\n\nfunction\
-  \ mergeObj(target, source) {\n  for (const key in source) {\n    if (source.hasOwnProperty(key))\
-  \ target[key] = source[key];\n  }\n  return target;\n}\n\nconst setGetAllEventData\
-  \ = (objToBeMerged) => {\n  mock('getAllEventData', mergeObj({\n    'x-ga-protocol_version':\
-  \ '2',\n    'x-ga-measurement_id': 'G-123ABC',\n    'x-ga-gtm_version': '45je55e1za200',\n\
-  \    'x-ga-page_id': 1747422523211,\n    'x-ga-gcd': '13l3l3l3l1l1',\n    'x-ga-npa':\
-  \ '0',\n    'x-ga-dma': '0',\n    'x-ga-mp2-tag_exp':\n      '101509157~103116025~103130498~103130500~103136993~103136995~103200001~103207802~103211513~103233427~103252644~103252646~103263073~103301114~103301116',\n\
-  \    client_id: 'AUJctU7H7hBB/aMuhE4pKwGu5DWDdklg5abyyyn8i/I=.1747154479',\n   \
-  \ 'x-ga-ecid': '1294673677',\n    language: 'en-us',\n    screen_resolution: '1512x982',\n\
-  \    event_location: { country: 'BR', region: 'SP' },\n    event_id: '101509157~103116025~103130498',\n\
-  \    timestamp: 1748377016,\n    client_hints: {\n      architecture: 'arm',\n \
-  \     bitness: '64',\n      full_version_list: [\n        { brand: 'Chromium', version:\
-  \ '136.0.7103.93' },\n        { brand: 'Google Chrome', version: '136.0.7103.93'\
-  \ },\n        { brand: 'Not.A/Brand', version: '99.0.0.0' }\n      ],\n      mobile:\
-  \ false,\n      model: '',\n      platform: 'macOS',\n      platform_version: '15.2.0',\n\
-  \      wow64: false,\n      brands: [\n        { brand: 'Chromium', version: '136'\
-  \ },\n        { brand: 'Google Chrome', version: '136' },\n        { brand: 'Not.A/Brand',\
-  \ version: '99' }\n      ]\n    },\n    'x-ga-are': '1',\n    'x-ga-mp2-frm': '0',\n\
-  \    'x-ga-pscdl': 'noapi',\n    'x-ga-system_properties': { eu: [34], tu: 'BA',\
-  \ ss: '1', ee: true },\n    'x-sst-system_properties': {\n      etld: 'google.com.br',\n\
-  \      tft: '1747422523211',\n      lpc: '60493049',\n      navt: 'r',\n      ude:\
-  \ '0',\n      sw_exp: '1',\n      request_start_time_ms: 1747422524851\n    },\n\
-  \    'x-ga-request_count': 1,\n    ga_session_id: '1747422523',\n    ga_session_number:\
-  \ 3,\n    'x-ga-mp2-seg': '0',\n    page_location: 'https://example.com/?test=1i23i21j3',\n\
-  \    page_title: 'Example Domain',\n    event_name: 'page_view',\n    'x-ga-tfd':\
-  \ 5784,\n    ip_override: '2804:14d:c096:8dd6:311c:8c00:e6c:e33',\n    user_agent:\n\
-  \      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,\
-  \ like Gecko) Chrome/136.0.0.0 Safari/537.36',\n    transaction_id: 'transactionId',\n\
-  \    value: 123.45,\n    currency: 'BRL',\n    payment_type: 'card',\n    customer_type:\
-  \ 'new', \n    user_id: 'userId',\n    user_data: {\n      email: { 0: 'userEmail',\
-  \ 1: 'test2@example.net' },\n      phone_number: '+55 (19) 99999-9999'\n    },\n\
-  \    coupon: 'coupon',\n    items: [\n      {\n        item_id: 'SKU_12345',\n \
-  \       item_name: 'Stan and Friends Tee',\n        affiliation: 'Google Merchandise\
-  \ Store',\n        coupon: 'SUMMER_FUN',\n        discount: 2.22,\n        index:\
-  \ 0,\n        item_brand: 'Google',\n        item_category: 'Apparel|iajsdiajsd|oasodiasd',\n\
-  \        item_list_id: 'related_products',\n        item_list_name: 'Related Products',\n\
-  \        item_variant: 'green',\n        location_id: 'ChIJIQBpAG2ahYAR_6128GcTUEo',\n\
-  \        price: 10.01,\n        quantity: 3,\n        item_group_id: 'abc'\n   \
-  \   },\n      {\n        item_id: 'SKU_12346',\n        item_name: \"Google Grey\
-  \ Women's (Tee)\",\n        affiliation: 'Google Merchandise Store',\n        coupon:\
-  \ 'SUMMER_FUN',\n        discount: 3.33,\n        index: 1,\n        item_brand:\
-  \ 'Google',\n        item_category: 'Apparel|iajsdiajsd|oasodiasd',\n        item_list_id:\
-  \ 'related_products',\n        item_list_name: 'Related Products',\n        item_variant:\
-  \ 'gray',\n        location_id: 'ChIJIQBpAG2ahYAR_6128GcTUEo',\n        price: 21.01,\n\
-  \        promotion_id: 'P_12345',\n        promotion_name: 'Summer Sale',\n    \
-  \    quantity: 2,\n        item_group_id: 'xyz'\n      }\n    ]\n  }, objToBeMerged\
-  \ || {}));\n};\n\nconst expectedBigQuerySettings = {\n  logBigQueryProjectId: 'logBigQueryProjectId',\n\
-  \  logBigQueryDatasetId: 'logBigQueryDatasetId',\n  logBigQueryTableId: 'logBigQueryTableId'\n\
-  };\n\nconst requiredConsoleKeys = ['Type', 'TraceId', 'Name'];\nconst requiredBqKeys\
-  \ = ['timestamp', 'type', 'trace_id', 'tag_name'];\nconst expectedBqOptions = {\
-  \ ignoreUnknownValues: true };\n\nconst mockData = {\n  useOptimisticScenario: false,\n\
-  \  adStorageConsent: 'optional',\n  logBigQueryProjectId: expectedBigQuerySettings.logBigQueryProjectId,\n\
-  \  logBigQueryDatasetId: expectedBigQuerySettings.logBigQueryDatasetId,\n  logBigQueryTableId:\
-  \ expectedBigQuerySettings.logBigQueryTableId\n};\n\nconst setAllMockDataByEventType\
-  \ = (type, objToBeMerged) => {\n  const mockDataByEventType = {\n    pageView: {\n\
-  \      type: 'pageView',\n      cookieDomain: 'auto',\n      cookieHttpOnly: false,\n\
-  \      cookieSameSite: 'none',\n      cookieExpiration: '30'\n    },\n    conversion_sale:\
-  \ { \n      type: 'conversion',\n      conversionType: 'sale',\n      autoMapData:\
-  \ true,\n      effinityId: 'effinityId',\n      consentPerformance: true,\n    \
-  \  orderOrLeadId: 'orderId',\n      value: 'value',\n      currency: 'currency',\n\
-  \      voucher: 'voucher',\n      idCompteur: 'eff_cpt',\n      effiId: 'eff_sub1',\n\
-  \      effiId2: 'eff_sub2',\n      prodId: 'eff_pid',\n      effiPcid: 'eff_pcid',\n\
-  \      effiPcuid: 'eff_pcuid',\n      effiParam1: 'eff_pr1',\n      paymentType:\
-  \ 'paymentype',\n      newCustomer: true,\n      cart: [\n        {\n          item_id:\
-  \ 'SKU_12345',\n          item_name: 'Stan and Friends Tee',\n          price: 10.01,\n\
-  \          quantity: 3\n        },\n        {\n          item_id: 'SKU_12346',\n\
-  \          item_name: \"Google Grey Women's (Tee)\",\n          price: 21.01,\n\
-  \          quantity: 2\n        }\n      ],\n      attribution: 2,\n      date:\
-  \ '2025-12-31',\n      customFields: [{ name: 'ref2', value: '123' }],\n      adStorageConsent:\
-  \ 'optional',\n      logType: 'debug',\n      bigQueryLogType: 'no'\n    },\n  \
-  \  conversion_lead: {\n      type: 'conversion',\n      conversionType: 'lead',\n\
-  \      autoMapData: true,\n      effinityId: 'effinityId',\n      consentPerformance:\
-  \ true,\n      orderOrLeadId: 'leadId',\n      idCompteur: 'eff_cpt',\n      effiId:\
-  \ 'eff_sub1',\n      effiId2: 'eff_sub2',\n      prodId: 'eff_pid',\n      effiPcid:\
-  \ 'eff_pcid',\n      effiPcuid: 'eff_pcuid',\n      effiParam1: 'eff_pr1',\n   \
-  \   attribution: 2,\n      date: '2025-12-31',\n      customFields: [{ name: 'ref2',\
-  \ value: '123' }],\n      adStorageConsent: 'optional',\n      logType: 'debug',\n\
-  \      bigQueryLogType: 'no'\n    }\n  };\n  \n  mergeObj(mockDataByEventType[type],\
-  \ objToBeMerged || {});\n  mergeObj(mockData, mockDataByEventType[type]);\n  return\
-  \ mockData;\n};\n\nmock('sendHttpRequest', (requestUrl, callback, requestOptions,\
-  \ requestBody) => {\n  if (typeof callback === 'function') {\n    callback(200);\n\
-  \  } else {\n    requestBody = requestOptions;\n    requestOptions = callback;\n\
-  \    return Promise.create((resolve, reject) => {\n      resolve({ statusCode: 200\
-  \ });\n    });  \n  }\n});\n\nmock('getRequestHeader', (header) => {\n  if (header\
-  \ === 'trace-id') return 'expectedTraceId';\n});\n\nmock('getTimestampMillis', 1747945830456);\n\
-  \nmock('generateRandom', 123456789);"
+scenarios: []
+setup: ''
 
 
 ___NOTES___
 
-Created on 7/31/2025, 6:02:27 PM
+Created on 11/12/2025, 14:22:45
 
 

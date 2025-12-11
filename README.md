@@ -45,3 +45,7 @@ This template requires the following permissions:
 - **Set Cookies**: To store the Click ID.
 - **Access BigQuery**: Requires `write` access if BigQuery logging is enabled.
 - **Access to Global Variables**: Reads event data, container version, and request headers.
+
+## Open Source
+
+The **Exoclick Tag for GTM Server Side** is developed and maintained by the [Stape Team](https://stape.io/) under the Apache 2.0 license.
