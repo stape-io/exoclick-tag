@@ -389,6 +389,7 @@ const sendPixelFromBrowser = require('sendPixelFromBrowser');
 const setCookie = require('setCookie');
 
 /*==============================================================================
+==============================================================================*/
 
 const eventData = getAllEventData();
 
@@ -405,6 +406,7 @@ if (data.useOptimisticScenario) {
 
 /*==============================================================================
   Vendor related functions
+==============================================================================*/
 
 function sendConversion(data, eventData) {
   const goal = data.conversionId;
@@ -561,6 +563,7 @@ function sendCookieSyncPixel(conversionParametersForCookieSync) {
 
 /*==============================================================================
   Helpers
+==============================================================================*/
 
 function checkGuardClauses(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
